@@ -1,1 +1,1 @@
-# on-chain-oracle-v2
+### Add .secret file and put mnemonic in it.

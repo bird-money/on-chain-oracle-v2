@@ -1,0 +1,29 @@
+{
+  "name": "bird-contract",
+  "version": "1.0.0",
+  "description": "",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "migrate": "truffle migrate --network kovan --reset && truffle run verify BirdOracle --network kovan"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moneybirdmi/bird-contract.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/moneybirdmi/bird-contract/issues"
+  },
+  "homepage": "https://github.com/moneybirdmi/bird-contract#readme",
+  "dependencies": {
+    "@openzeppelin/contracts": "^3.1.0",
+    "@openzeppelin/test-helpers": "^0.5.10",
+    "@truffle/hdwallet-provider": "^1.2.2",
+    "truffle-plugin-verify": "^0.5.4"
+  }
+}
