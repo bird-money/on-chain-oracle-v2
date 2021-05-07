@@ -1,38 +1,19 @@
 pragma solidity 0.6.12;
 
-/**
-Bird On-chain Oracle to confirm rating with 50% consensus before update using the off-chain API https://www.bird.money/docs
-*/
-
 // © 2020 Bird Money
 // SPDX-License-Identifier: MIT
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "./Unlockable.sol";
 
-contract BirdOracle is Ownable {
+/// @title Oracle service to find rating of any ethereum address
+/// @author Bird Money
+/// @notice Bird On-chain Oracle to confirm rating with consensus before update using the off-chain API
+/// @dev for details https://www.bird.money/docs
+contract BirdOracle is Unlockable {
     using SafeMath for uint256;
-
-    BirdRequest[] public onChainRequests; //keep track of list of on-chain
-
-    uint256 public minConsensus = 2; //minimum votes on an answer before confirmation
-    uint256 public birdNest = 0; // birds in nest count i.e total trusted providers
-    uint256 public trackId = 0; //current request id
-
-    address[] public providers; //offchain oracle nodes
-    mapping(address => uint256) statusOf; //offchain data provider address => TRUSTED or NOT
-
-    //status of providers with respect to all requests
-    uint8 constant NOT_TRUSTED = 0;
-    uint8 constant TRUSTED = 1;
-    uint8 constant WAS_TRUSTED = 2;
-
-    //status of with respect to individual request
-    uint8 constant NOT_VOTED = 0;
-    uint8 constant VOTED = 2;
-
     /**
-     * Bird Standard API Request
+     * @dev Bird Standard API Request
      * id: "1"
      * ethAddress: address(0xcF01971DB0CAB2CBeE4A8C21BB7638aC1FA1c38c)
      * key: "bird_rating"
@@ -52,12 +33,39 @@ contract BirdOracle is Ownable {
         mapping(address => uint256) statusOf; //offchain data provider address => VOTED or NOT
     }
 
+    /// @notice keep track of list of on-chain requestes
+    BirdRequest[] public onChainRequests;
+
+    /// @notice minimum votes on an answer before confirmation
+    uint256 public minConsensus = 2;
+
+    /// @notice birds in nest count i.e total trusted providers
+    uint256 public birdNest = 0;
+
+    /// @notice current request id
+    uint256 public trackId = 0;
+
+    /// @notice all offchain oracle nodes i.e trusted and may be some are not trusted
+    address[] public providers;
+
+    /// @notice offchain data provider address => TRUSTED or NOT
+    mapping(address => uint256) public statusOf;
+
+    /// @notice status of providers with respect to all requests
+    uint8 public constant NOT_TRUSTED = 0;
+    uint8 public constant TRUSTED = 1;
+    uint8 public constant WAS_TRUSTED = 2;
+
+    /// @notice status of with respect to individual request
+    uint8 public constant NOT_VOTED = 0;
+    uint8 public constant VOTED = 2;
+
     mapping(address => uint256) private ratingOf; //saved ratings of eth addresses after consensus
 
-    // Bird Standard API Request Off-Chain-Request from outside the blockchain
+    /// @notice  Bird Standard API Request Off-Chain-Request from outside the blockchain
     event OffChainRequest(uint256 id, address ethAddress, string key);
 
-    // To call when there is consensus on final result
+    /// @notice  To call when there is consensus on final result
     event UpdatedRequest(
         uint256 id,
         address ethAddress,
@@ -65,14 +73,27 @@ contract BirdOracle is Ownable {
         uint256 value
     );
 
+    /// @notice when an off-chain data provider is added
     event ProviderAdded(address provider);
+
+    /// @notice when an off-chain data provider is removed
     event ProviderRemoved(address provider);
 
-    constructor(address _birdTokenAddr) public {
-        birdToken = IERC20(_birdTokenAddr);
+    /// @notice When reward token changes
+    /// @param rewardToken the token in which rewards are given
+    event RewardTokenChanged(IERC20 rewardToken);
+
+    /// @notice When min consensus value changes
+    /// @param minConsensus minimum number of votes required to accept an answer from offchain data providers
+    event MinConsensusChanged(uint256 minConsensus);
+
+    constructor(address _rewardTokenAddr) public {
+        rewardToken = IERC20(_rewardTokenAddr);
     }
 
-    function addProvider(address _provider) public onlyOwner {
+    /// @notice add any address as off-chain data provider to trusted providers list
+    /// @param _provider the address which is added
+    function addProvider(address _provider) external onlyOwner {
         require(statusOf[_provider] != TRUSTED, "Provider is already added.");
 
         if (statusOf[_provider] == NOT_TRUSTED) providers.push(_provider);
@@ -82,7 +103,9 @@ contract BirdOracle is Ownable {
         emit ProviderAdded(_provider);
     }
 
-    function removeProvider(address _provider) public onlyOwner {
+    /// @notice remove any address as off-chain data provider from trusted providers list
+    /// @param _provider the address which is removed
+    function removeProvider(address _provider) external onlyOwner {
         require(statusOf[_provider] == TRUSTED, "Provider is already removed.");
 
         statusOf[_provider] = WAS_TRUSTED;
@@ -91,7 +114,12 @@ contract BirdOracle is Ownable {
         emit ProviderRemoved(_provider);
     }
 
-    function newChainRequest(address _ethAddress, string memory _key) public {
+    /// @notice Bird Standard API Request Off-Chain-Request from outside the blockchain
+    /// @param _ethAddress the address which rating is required to read from offchain
+    /// @param _key its tells offchain data providers from any specific attributes
+    function newChainRequest(address _ethAddress, string memory _key) external {
+        require(bytes(_key).length > 0, "String with 0 length no allowed");
+
         onChainRequests.push(
             BirdRequest({
                 id: trackId,
@@ -109,25 +137,27 @@ contract BirdOracle is Ownable {
         trackId++;
     }
 
-    //called by the Off-Chain oracle to record its answer
-    function updatedChainRequest(uint256 _id, uint256 _response) public {
+    /// @notice called by the Off-Chain oracle to record its answer
+    /// @param _id the request id
+    /// @param _response the answer to query of this request id
+    function updatedChainRequest(uint256 _id, uint256 _response) external {
         BirdRequest storage req = onChainRequests[_id];
-
+        address sender = msg.sender;
         require(
-            req.resolved == false,
+            !req.resolved,
             "Error: Consensus is complete so you can not vote."
         );
         require(
-            statusOf[msg.sender] == TRUSTED,
+            statusOf[sender] == TRUSTED,
             "Error: You are not allowed to vote."
         );
 
         require(
-            req.statusOf[msg.sender] == NOT_VOTED,
+            req.statusOf[sender] == NOT_VOTED,
             "Error: You have already voted."
         );
 
-        req.statusOf[msg.sender] = VOTED;
+        req.statusOf[sender] = VOTED;
         uint256 thisAnswerVotes = ++req.votesOf[_response];
 
         if (thisAnswerVotes >= minConsensus) {
@@ -138,23 +168,30 @@ contract BirdOracle is Ownable {
         }
     }
 
+    /// @notice get rating of any address
+    /// @param _ethAddress the address which rating is required to read from offchain
+    /// @return the required rating of any ethAddress
     function getRatingByAddress(address _ethAddress)
-        public
+        external
         view
         returns (uint256)
     {
         return ratingOf[_ethAddress];
     }
 
-    function getRating() public view returns (uint256) {
+    /// @notice get rating of caller address
+    /// @return the required rating of caller
+    function getRatingOfCaller() external view returns (uint256) {
         return ratingOf[msg.sender];
     }
 
-    //get trusted providers
-    function getProviders() public view returns (address[] memory) {
+    /// @notice get rating of trusted providers to show on ui
+    /// @return the trusted providers list
+    function getProviders() external view returns (address[] memory) {
         address[] memory trustedProviders = new address[](birdNest);
         uint256 t_i = 0;
-        for (uint256 i = 0; i < providers.length; i++) {
+        uint256 totalProviders = providers.length;
+        for (uint256 i = 0; i < totalProviders; i++) {
             if (statusOf[providers[i]] == TRUSTED) {
                 trustedProviders[t_i] = providers[i];
                 t_i++;
@@ -163,25 +200,35 @@ contract BirdOracle is Ownable {
         return trustedProviders;
     }
 
-    IERC20 public birdToken;
+    /// @notice the token in which the reward is given
+    IERC20 public rewardToken;
 
-    function rewardProviders() public onlyOwner {
-        //give 50% BIRD in this contract to owner and 50% to providers
-        uint256 rewardToOwnerPercentage = 50; // 50% reward to owner and rest money to providers
+    /// @notice owner can reward providers with USDT or any ERC20 token
+    /// @param _totalSentReward the amount of tokens to be equally distributed to all trusted providers
+    function rewardProviders(uint256 _totalSentReward) external onlyOwner {
+        require(
+            rewardToken.balanceOf(owner()) > _totalSentReward,
+            "You have less balance"
+        );
+        uint256 rewardToEachProvider = _totalSentReward.div(birdNest);
 
-        uint256 balance = birdToken.balanceOf(address(this));
-        uint256 rewardToOwner = balance.mul(rewardToOwnerPercentage).div(100);
-        uint256 rewardToProviders = balance - rewardToOwner;
-        uint256 rewardToEachProvider = rewardToProviders.div(birdNest);
-
-        birdToken.transfer(owner(), rewardToOwner);
-
-        for (uint256 i = 0; i < providers.length; i++)
+        uint256 totalProviders = providers.length;
+        for (uint256 i = 0; i < totalProviders; i++)
             if (statusOf[providers[i]] == TRUSTED)
-                birdToken.transfer(providers[i], rewardToEachProvider);
+                rewardToken.transfer(providers[i], rewardToEachProvider);
     }
 
-    function setMinConsensus(uint256 _minConsensus) public onlyOwner {
+    /// @notice owner can set reward token according to the needs
+    /// @param _minConsensus minimum number of votes required to accept an answer from offchain data providers
+    function setMinConsensus(uint256 _minConsensus) external onlyOwner {
         minConsensus = _minConsensus;
+        emit MinConsensusChanged(_minConsensus);
+    }
+
+    /// @notice owner can set reward token according to the needs
+    /// @param _rewardToken the token in which rewards are given
+    function setRewardToken(IERC20 _rewardToken) external onlyOwner {
+        rewardToken = _rewardToken;
+        emit RewardTokenChanged(_rewardToken);
     }
 }
