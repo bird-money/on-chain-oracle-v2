@@ -51,6 +51,12 @@ contract BirdOracle is Unlockable {
     /// @notice offchain data provider address => TRUSTED or NOT
     mapping(address => uint256) public statusOf;
 
+    /// @notice offchain data provider address => no of answers casted
+    mapping(address => uint256) public answersGivenBy;
+
+    /// @notice offchain data provider address => no of answers casted
+    uint256 public totalAnswersGiven = 0;
+
     /// @notice status of providers with respect to all requests
     uint8 public constant NOT_TRUSTED = 0;
     uint8 public constant TRUSTED = 1;
@@ -143,10 +149,12 @@ contract BirdOracle is Unlockable {
     function updatedChainRequest(uint256 _id, uint256 _response) external {
         BirdRequest storage req = onChainRequests[_id];
         address sender = msg.sender;
+
         require(
             !req.resolved,
             "Error: Consensus is complete so you can not vote."
         );
+
         require(
             statusOf[sender] == TRUSTED,
             "Error: You are not allowed to vote."
@@ -156,6 +164,10 @@ contract BirdOracle is Unlockable {
             req.statusOf[sender] == NOT_VOTED,
             "Error: You have already voted."
         );
+
+        // all clear, going to record answer
+        answersGivenBy[sender]++;
+        totalAnswersGiven++;
 
         req.statusOf[sender] = VOTED;
         uint256 thisAnswerVotes = ++req.votesOf[_response];
@@ -206,16 +218,28 @@ contract BirdOracle is Unlockable {
     /// @notice owner can reward providers with USDT or any ERC20 token
     /// @param _totalSentReward the amount of tokens to be equally distributed to all trusted providers
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
+        // pay to each provider based on his weight
+        // at end reset weight
+
         require(
             rewardToken.balanceOf(owner()) > _totalSentReward,
             "You have less balance"
         );
-        uint256 rewardToEachProvider = _totalSentReward.div(birdNest);
-
+        uint256 rewardToThisProvider = 0; //_totalSentReward.div(birdNest);
+        address thisProvider;
         uint256 totalProviders = providers.length;
-        for (uint256 i = 0; i < totalProviders; i++)
-            if (statusOf[providers[i]] == TRUSTED)
-                rewardToken.transfer(providers[i], rewardToEachProvider);
+        for (uint256 i = 0; i < totalProviders; i++) {
+            thisProvider = providers[i];
+            if (statusOf[thisProvider] == TRUSTED) {
+                rewardToThisProvider = _totalSentReward
+                    .mul(answersGivenBy[thisProvider])
+                    .div(totalAnswersGiven);
+
+                answersGivenBy[thisProvider] = 0;
+                rewardToken.transfer(thisProvider, rewardToThisProvider);
+            }
+        }
+        totalAnswersGiven = 0;
     }
 
     /// @notice owner can set reward token according to the needs
