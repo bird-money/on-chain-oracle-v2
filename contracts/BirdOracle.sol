@@ -54,6 +54,9 @@ contract BirdOracle is Unlockable {
     /// @notice offchain data provider address => no of answers casted
     mapping(address => uint256) public answersGivenBy;
 
+    /// @notice rewards of each provider
+    mapping(address => uint256) public rewardOf;
+
     /// @notice offchain data provider address => no of answers casted
     uint256 public totalAnswersGiven = 0;
 
@@ -84,10 +87,6 @@ contract BirdOracle is Unlockable {
 
     /// @notice when an off-chain data provider is removed
     event ProviderRemoved(address provider);
-
-    /// @notice When reward token changes
-    /// @param rewardToken the token in which rewards are given
-    event RewardTokenChanged(IERC20 rewardToken);
 
     /// @notice When min consensus value changes
     /// @param minConsensus minimum number of votes required to accept an answer from offchain data providers
@@ -212,14 +211,22 @@ contract BirdOracle is Unlockable {
         return trustedProviders;
     }
 
+    /// @notice owner can set reward token according to the needs
+    /// @param _minConsensus minimum number of votes required to accept an answer from offchain data providers
+    function setMinConsensus(uint256 _minConsensus) external onlyOwner {
+        minConsensus = _minConsensus;
+        emit MinConsensusChanged(_minConsensus);
+    }
+
     /// @notice the token in which the reward is given
     IERC20 public rewardToken;
 
     /// @notice owner can reward providers with USDT or any ERC20 token
     /// @param _totalSentReward the amount of tokens to be equally distributed to all trusted providers
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
-        // pay to each provider based on his weight
-        // at end reset weight
+        // overall logic
+        // add money to each providers wallet based on his weight of answers vs totalAnswersGiven
+        // at end reset all weights of answers
 
         require(
             rewardToken.balanceOf(owner()) > _totalSentReward,
@@ -236,23 +243,17 @@ contract BirdOracle is Unlockable {
                     .div(totalAnswersGiven);
 
                 answersGivenBy[thisProvider] = 0;
-                rewardToken.transfer(thisProvider, rewardToThisProvider);
+                rewardOf[thisProvider] += rewardToThisProvider;
             }
         }
         totalAnswersGiven = 0;
+        rewardToken.transferFrom(owner(), address(this), _totalSentReward);
     }
 
-    /// @notice owner can set reward token according to the needs
-    /// @param _minConsensus minimum number of votes required to accept an answer from offchain data providers
-    function setMinConsensus(uint256 _minConsensus) external onlyOwner {
-        minConsensus = _minConsensus;
-        emit MinConsensusChanged(_minConsensus);
-    }
-
-    /// @notice owner can set reward token according to the needs
-    /// @param _rewardToken the token in which rewards are given
-    function setRewardToken(IERC20 _rewardToken) external onlyOwner {
-        rewardToken = _rewardToken;
-        emit RewardTokenChanged(_rewardToken);
+    /// @notice any node provider can call this method to withdraw his reward 
+    function getReward() public {
+        uint256 reward = rewardOf[msg.sender];
+        rewardOf[msg.sender] = 0;
+        rewardToken.transfer(msg.sender, reward);
     }
 }
