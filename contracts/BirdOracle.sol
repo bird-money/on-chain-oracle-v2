@@ -51,14 +51,14 @@ contract BirdOracle is Unlockable {
     /// @notice offchain data provider address => TRUSTED or NOT
     mapping(address => uint256) public statusOf;
 
-    /// @notice offchain data provider address => no of answers casted
-    mapping(address => uint256) public answersGivenBy;
+    /// @notice offchain data provider address => (onPortion => no of answers) casted
+    mapping(address => mapping(uint256 => uint256)) public answersGivenBy;
+
+    /// @notice offchain data provider answers, onPortion => total no of answers
+    mapping(uint256 => uint256) public totalAnswersGiven;
 
     /// @notice rewards of each provider
     mapping(address => uint256) public rewardOf;
-
-    /// @notice offchain data provider address => no of answers casted
-    uint256 public totalAnswersGiven = 0;
 
     /// @notice status of providers with respect to all requests
     uint8 public constant NOT_TRUSTED = 0;
@@ -70,6 +70,11 @@ contract BirdOracle is Unlockable {
     uint8 public constant VOTED = 2;
 
     mapping(address => uint256) private ratingOf; //saved ratings of eth addresses after consensus
+
+    uint256 private onPortion = 1; // portion means portions of answers or group of answers, portion id from 0,1,2,.. to n
+
+    /// @notice the token in which the reward is given
+    IERC20 public rewardToken;
 
     /// @notice  Bird Standard API Request Off-Chain-Request from outside the blockchain
     event OffChainRequest(uint256 id, address ethAddress, string key);
@@ -164,9 +169,8 @@ contract BirdOracle is Unlockable {
             "Error: You have already voted."
         );
 
-        // all clear, going to record answer
-        answersGivenBy[sender]++;
-        totalAnswersGiven++;
+        answersGivenBy[sender][onPortion]++;
+        totalAnswersGiven[onPortion]++;
 
         req.statusOf[sender] = VOTED;
         uint256 thisAnswerVotes = ++req.votesOf[_response];
@@ -218,42 +222,48 @@ contract BirdOracle is Unlockable {
         emit MinConsensusChanged(_minConsensus);
     }
 
-    /// @notice the token in which the reward is given
-    IERC20 public rewardToken;
-
     /// @notice owner can reward providers with USDT or any ERC20 token
     /// @param _totalSentReward the amount of tokens to be equally distributed to all trusted providers
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
-        // overall logic
-        // add money to each providers wallet based on his weight of answers vs totalAnswersGiven
-        // at end reset all weights of answers
-
-        require(
-            rewardToken.balanceOf(owner()) > _totalSentReward,
-            "You have less balance"
-        );
-        uint256 rewardToThisProvider = 0; //_totalSentReward.div(birdNest);
-        address thisProvider;
-        uint256 totalProviders = providers.length;
-        for (uint256 i = 0; i < totalProviders; i++) {
-            thisProvider = providers[i];
-            if (statusOf[thisProvider] == TRUSTED) {
-                rewardToThisProvider = _totalSentReward
-                    .mul(answersGivenBy[thisProvider])
-                    .div(totalAnswersGiven);
-
-                answersGivenBy[thisProvider] = 0;
-                rewardOf[thisProvider] += rewardToThisProvider;
-            }
-        }
-        totalAnswersGiven = 0;
+        // handle 0 id and later etc.
+        rewards[onPortion] = _totalSentReward;
+        onPortion++;
         rewardToken.transferFrom(owner(), address(this), _totalSentReward);
     }
 
-    /// @notice any node provider can call this method to withdraw his reward 
+    mapping(address => uint256) private lastRewardPortionOf;
+
+    /// @notice any node provider can call this method to withdraw his reward
     function getReward() public {
-        uint256 reward = rewardOf[msg.sender];
-        rewardOf[msg.sender] = 0;
-        rewardToken.transfer(msg.sender, reward);
+        // uint256 reward = rewardOf[msg.sender];
+        // rewardOf[msg.sender] = 0;
+        // rewardToken.transfer(msg.sender, reward);
+    }
+
+    /// @notice stores the list of rewards given by owner
+    /// @dev answers are divided in portions, (uint256 => uint256) means (answersPortionId => ownerAddedRewardForThisPortion)
+    mapping(uint256 => uint256) public rewards;
+
+    /// @notice any node provider can call this method to withdraw his reward
+    /// @param _portions amount of reward blocks from which you want to get your reward
+    function getReward(uint256 _portions) public {
+        address sender = msg.sender;
+        uint256 lastRewardedPortion = lastRewardPortionOf[sender];
+        uint256 toRewardPortion = lastRewardedPortion + _portions;
+        if (toRewardPortion > onPortion) toRewardPortion = onPortion;
+        lastRewardPortionOf[sender] = toRewardPortion;
+
+        uint256 accReward = 0;
+        for (
+            uint256 onThisPortion = lastRewardedPortion;
+            onThisPortion < toRewardPortion;
+            onThisPortion++
+        ) {
+            accReward += rewards[onThisPortion]
+                .mul(answersGivenBy[sender][onThisPortion])
+                .div(totalAnswersGiven[onThisPortion]);
+        }
+
+        rewardToken.transfer(sender, accReward);
     }
 }
