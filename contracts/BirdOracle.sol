@@ -225,7 +225,7 @@ contract BirdOracle is Unlockable {
     /// @notice owner can reward providers with USDT or any ERC20 token
     /// @param _totalSentReward the amount of tokens to be equally distributed to all trusted providers
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
-        // handle 0 id and later etc.
+        require(_totalSentReward != 0, "Can not give ZERO reward.");
         rewards[onPortion] = _totalSentReward;
         onPortion++;
         rewardToken.transferFrom(owner(), address(this), _totalSentReward);
@@ -241,6 +241,8 @@ contract BirdOracle is Unlockable {
     /// @param _portions amount of reward blocks from which you want to get your reward
     function withdrawReward(uint256 _portions) public {
         address sender = msg.sender;
+        require(statusOf[sender] == TRUSTED, "You can not withdraw reward.");
+
         uint256 lastRewardedPortion = lastRewardPortionOf[sender];
         uint256 toRewardPortion = lastRewardedPortion + _portions;
         if (toRewardPortion > onPortion) toRewardPortion = onPortion;
@@ -281,7 +283,18 @@ contract BirdOracle is Unlockable {
     }
 
     /// @notice owner calls this function to see how much reward should he give to node providers
+    /// @return total no of answers given in this portion of answers
     function getTotalAnswersGivenAfterReward() public view returns (uint256) {
         return totalAnswersGiven[onPortion];
+    }
+
+    /// @notice owner calls this function to see how much reward he gave to node providers
+    /// @return list of rewards given by owner
+    function rewardsGivenTillNow() public view returns (uint256[] memory) {
+        uint256[] memory rewardsGiven = new uint256[](onPortion);
+        for (uint256 i = 1; rewards[i] != 0; i++) {
+            rewardsGiven[i] = rewards[i];
+        }
+        return rewardsGiven;
     }
 }

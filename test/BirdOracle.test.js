@@ -5,9 +5,9 @@ contract("BirdOracle", (accounts) => {
   let birdToken, birdOracle, startTime;
   beforeEach(async () => {
     birdToken = await BirdToken.new();
-    console.log("birdToken", birdToken.address);
+    // console.log("birdToken", birdToken.address);
     birdOracle = await BirdOracle.new(birdToken.address);
-    console.log("birdOracle", birdOracle.address);
+    // console.log("birdOracle", birdOracle.address);
   });
 
   // Main Test:
@@ -84,18 +84,21 @@ contract("BirdOracle", (accounts) => {
     // both see their rewards
     // one with draw reward
     // both see their rewards
+    // withdraw reward p1
+    // check reward p1,p2
+    // give answers then again with draw and check reward...
 
     let ethAddress = accounts[1],
       attributeToFetch = "bird_rating",
       provider1 = accounts[2],
       provider2 = accounts[3];
 
-    //create a request
-    await birdOracle.newChainRequest(ethAddress, attributeToFetch);
-
     //add providers
     await birdOracle.addProvider(provider1);
     await birdOracle.addProvider(provider2);
+
+    //create a request
+    await birdOracle.newChainRequest(ethAddress, attributeToFetch);
 
     //do consensus
     await birdOracle.updatedChainRequest(
@@ -118,10 +121,81 @@ contract("BirdOracle", (accounts) => {
     //   (await birdOracle.getTotalAnswersGivenAfterReward()).toString()
     // );
 
-    const rewardProvider1 = await birdOracle.seeReward(100, {
+    let rewardProvider1 = await birdOracle.seeReward(100, {
       from: provider1,
     });
-    console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
+    // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
+
+    await birdOracle.withdrawReward((portions = 100), { from: provider1 });
+
+    let provider1reward = await birdToken.balanceOf(provider1);
+    // console.log("provider1reward: ", fromWei(provider1reward.toString()));
+
+    // // console.log()
+    rewardProvider1 = await birdOracle.seeReward(100, {
+      from: provider1,
+    });
+    // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
+
+    await birdOracle.withdrawReward((portions = 100), { from: provider1 });
+
+    provider1reward = await birdToken.balanceOf(provider1);
+    // console.log("provider1reward: ", fromWei(provider1reward.toString()));
+
+    /*
+    
+    
+    */
+
+    //create a request
+    await birdOracle.newChainRequest(ethAddress, attributeToFetch);
+
+    //do consensus
+    await birdOracle.updatedChainRequest(
+      (_id = 1),
+      (_response = toWei("1.4")),
+      { from: provider1 }
+    );
+    await birdOracle.updatedChainRequest(
+      (_id = 1),
+      (_response = toWei("1.4")),
+      { from: provider2 }
+    );
+
+    //owner adds reward
+    await birdToken.approve(birdOracle.address, toWei("100000000"));
+    await birdOracle.rewardProviders(toWei("80"));
+
+    rewardProvider1 = await birdOracle.seeReward(100, {
+      from: provider1,
+    });
+    // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
+
+    await birdOracle.withdrawReward((portions = 100), { from: provider1 });
+
+    provider1reward = await birdToken.balanceOf(provider1);
+    // console.log("provider1reward: ", fromWei(provider1reward.toString()));
+
+    // // console.log()
+    rewardProvider1 = await birdOracle.seeReward(100, {
+      from: provider1,
+    });
+    // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
+
+    await birdOracle.withdrawReward((portions = 100), { from: provider1 });
+
+    provider1reward = await birdToken.balanceOf(provider1);
+    // console.log("provider1reward: ", fromWei(provider1reward.toString()));
+
+    await birdOracle.withdrawReward((portions = 100), { from: provider2 });
+
+    let provider2reward = await birdToken.balanceOf(provider2);
+    console.log("provider2reward: ", fromWei(provider2reward.toString()));
+
+    let rewardsGiven = await birdOracle.rewardsGivenTillNow();
+    rewardsGiven.map((reward, i) =>
+      console.log(`rewardsGiven ${i} : ${see(reward)}`)
+    );
   });
 });
 
@@ -134,6 +208,7 @@ const toWei = (eth) => web3.utils.toWei(eth);
 
 const fromWei = (eth) => web3.utils.fromWei(eth);
 
+const see = (s) => fromWei(s.toString());
 //Some other test:
 // call all functions in contract
 // able to read my rating.
