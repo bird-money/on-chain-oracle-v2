@@ -233,37 +233,55 @@ contract BirdOracle is Unlockable {
 
     mapping(address => uint256) private lastRewardPortionOf;
 
-    /// @notice any node provider can call this method to withdraw his reward
-    function getReward() public {
-        // uint256 reward = rewardOf[msg.sender];
-        // rewardOf[msg.sender] = 0;
-        // rewardToken.transfer(msg.sender, reward);
-    }
-
     /// @notice stores the list of rewards given by owner
     /// @dev answers are divided in portions, (uint256 => uint256) means (answersPortionId => ownerAddedRewardForThisPortion)
     mapping(uint256 => uint256) public rewards;
 
     /// @notice any node provider can call this method to withdraw his reward
     /// @param _portions amount of reward blocks from which you want to get your reward
-    function getReward(uint256 _portions) public {
+    function withdrawReward(uint256 _portions) public {
         address sender = msg.sender;
         uint256 lastRewardedPortion = lastRewardPortionOf[sender];
         uint256 toRewardPortion = lastRewardedPortion + _portions;
         if (toRewardPortion > onPortion) toRewardPortion = onPortion;
         lastRewardPortionOf[sender] = toRewardPortion;
+        uint256 accReward = getAccReward(lastRewardedPortion, toRewardPortion);
+        rewardToken.transfer(sender, accReward);
+    }
 
+    /// @notice any node provider can call this method to withdraw his reward
+    /// @param _portions amount of reward blocks from which you want to get your reward
+    function seeReward(uint256 _portions) public view returns (uint256) {
+        address sender = msg.sender;
+        uint256 lastRewardedPortion = lastRewardPortionOf[sender];
+        uint256 toRewardPortion = lastRewardedPortion + _portions;
+        if (toRewardPortion > onPortion) toRewardPortion = onPortion;
+        return getAccReward(lastRewardedPortion, toRewardPortion);
+    }
+
+    function getAccReward(uint256 lastRewardedPortion, uint256 toRewardPortion)
+        private
+        view
+        returns (uint256)
+    {
+        address sender = msg.sender;
         uint256 accReward = 0;
         for (
             uint256 onThisPortion = lastRewardedPortion;
             onThisPortion < toRewardPortion;
             onThisPortion++
         ) {
-            accReward += rewards[onThisPortion]
-                .mul(answersGivenBy[sender][onThisPortion])
-                .div(totalAnswersGiven[onThisPortion]);
+            if (totalAnswersGiven[onThisPortion] > 0)
+                accReward += rewards[onThisPortion]
+                    .mul(answersGivenBy[sender][onThisPortion])
+                    .div(totalAnswersGiven[onThisPortion]);
         }
 
-        rewardToken.transfer(sender, accReward);
+        return accReward;
+    }
+
+    /// @notice owner calls this function to see how much reward should he give to node providers
+    function getTotalAnswersGivenAfterReward() public view returns (uint256) {
+        return totalAnswersGiven[onPortion];
     }
 }

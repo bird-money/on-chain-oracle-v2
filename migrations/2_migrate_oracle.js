@@ -1,5 +1,5 @@
 const BirdOracle = artifacts.require('BirdOracle');
-const BirdToken = artifacts.require('BirdToken');
+const BirdToken = artifacts.require('RedToken');
 
 const localDeployScript = async (deployer) => {
   console.log('Deploying to local blockchain');
