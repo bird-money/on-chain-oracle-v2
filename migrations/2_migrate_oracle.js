@@ -9,8 +9,8 @@ const localDeployScript = async (deployer) => {
 
 const kovanDeployScript = async (deployer) => {
   console.log('Deploying to kovan');
-  const birdTokenAddress = '0xee426697da6885e7c8c0d48255de85ac412dd7b9';
-  await deployer.deploy(BirdOracle, birdTokenAddress);
+  const usdtAddress = '0xaA7C9d8544Dd696239D9a953De2fAF7AA2852e22';
+  await deployer.deploy(BirdOracle, usdtAddress);
 };
 
 const mainnetDeployScript = async (deployer) => {

@@ -8,8 +8,8 @@ import "./Unlockable.sol";
 
 /// @title Oracle service to find rating of any ethereum address
 /// @author Bird Money
-/// @notice Bird On-chain Oracle to confirm rating with consensus before update using the off-chain API
-/// @dev for details https://www.bird.money/docs
+/// @notice Bird On-chain Oracle to confirm rating with consensus before update using the off-chain API. for details https://www.bird.money/docs
+/// @dev reward to node providers is a list. rewards = [reward1, reward2, reward3, ...]
 contract BirdOracle is Unlockable {
     using SafeMath for uint256;
     /**
@@ -40,34 +40,31 @@ contract BirdOracle is Unlockable {
     uint256 public minConsensus = 2;
 
     /// @notice birds in nest count i.e total trusted providers
-    uint256 public birdNest = 0;
+    uint256 public totalTrustedProviders = 0;
 
     /// @notice current request id
-    uint256 public trackId = 0;
+    uint256 public currRequestId = 0;
 
-    /// @notice all offchain oracle nodes i.e trusted and may be some are not trusted
-    address[] public providers;
+    // all offchain oracle nodes i.e trusted and may be some are not trusted
+    address[] private providers;
 
     /// @notice offchain data provider address => TRUSTED or NOT
     mapping(address => uint256) public statusOf;
 
-    /// @notice offchain data provider address => (onPortion => no of answers) casted
-    mapping(address => mapping(uint256 => uint256)) public answersGivenBy;
+    // offchain data provider address => (onPortion => no of answers) casted
+    mapping(address => mapping(uint256 => uint256)) private answersGivenBy;
 
     /// @notice offchain data provider answers, onPortion => total no of answers
     mapping(uint256 => uint256) public totalAnswersGiven;
 
-    /// @notice rewards of each provider
-    mapping(address => uint256) public rewardOf;
+    // status of providers with respect to all requests
+    uint8 private constant NOT_TRUSTED = 0;
+    uint8 private constant TRUSTED = 1;
+    uint8 private constant WAS_TRUSTED = 2;
 
-    /// @notice status of providers with respect to all requests
-    uint8 public constant NOT_TRUSTED = 0;
-    uint8 public constant TRUSTED = 1;
-    uint8 public constant WAS_TRUSTED = 2;
-
-    /// @notice status of with respect to individual request
-    uint8 public constant NOT_VOTED = 0;
-    uint8 public constant VOTED = 2;
+    // status of with respect to individual request
+    uint8 private constant NOT_VOTED = 0;
+    uint8 private constant VOTED = 2;
 
     mapping(address => uint256) private ratingOf; //saved ratings of eth addresses after consensus
 
@@ -97,6 +94,11 @@ contract BirdOracle is Unlockable {
     /// @param minConsensus minimum number of votes required to accept an answer from offchain data providers
     event MinConsensusChanged(uint256 minConsensus);
 
+    /// @notice When a node provider withdraw his reward
+    /// @param _provider the node provider i.e off-chain data provider
+    /// @param _accReward the amount of reward collected by node provider
+    event RewardWithdrawn(address _provider, uint256 _accReward);
+
     constructor(address _rewardTokenAddr) public {
         rewardToken = IERC20(_rewardTokenAddr);
     }
@@ -108,7 +110,7 @@ contract BirdOracle is Unlockable {
 
         if (statusOf[_provider] == NOT_TRUSTED) providers.push(_provider);
         statusOf[_provider] = TRUSTED;
-        ++birdNest;
+        totalTrustedProviders.add(1);
 
         emit ProviderAdded(_provider);
     }
@@ -119,7 +121,7 @@ contract BirdOracle is Unlockable {
         require(statusOf[_provider] == TRUSTED, "Provider is already removed.");
 
         statusOf[_provider] = WAS_TRUSTED;
-        --birdNest;
+        totalTrustedProviders.sub(1);
 
         emit ProviderRemoved(_provider);
     }
@@ -132,7 +134,7 @@ contract BirdOracle is Unlockable {
 
         onChainRequests.push(
             BirdRequest({
-                id: trackId,
+                id: currRequestId,
                 ethAddress: _ethAddress,
                 key: _key,
                 value: 0, // if resolved is true then read value
@@ -141,10 +143,10 @@ contract BirdOracle is Unlockable {
         );
 
         //Off-Chain event trigger
-        emit OffChainRequest(trackId, _ethAddress, _key);
+        emit OffChainRequest(currRequestId, _ethAddress, _key);
 
         //update total number of requests
-        trackId++;
+        currRequestId.add(1);
     }
 
     /// @notice called by the Off-Chain oracle to record its answer
@@ -169,11 +171,12 @@ contract BirdOracle is Unlockable {
             "Error: You have already voted."
         );
 
-        answersGivenBy[sender][onPortion]++;
-        totalAnswersGiven[onPortion]++;
+        answersGivenBy[sender][onPortion].add(1);
+        totalAnswersGiven[onPortion].add(1);
 
         req.statusOf[sender] = VOTED;
-        uint256 thisAnswerVotes = ++req.votesOf[_response];
+        req.votesOf[_response] = req.votesOf[_response].add(1);
+        uint256 thisAnswerVotes = req.votesOf[_response];
 
         if (thisAnswerVotes >= minConsensus) {
             req.resolved = true;
@@ -203,13 +206,14 @@ contract BirdOracle is Unlockable {
     /// @notice get rating of trusted providers to show on ui
     /// @return the trusted providers list
     function getProviders() external view returns (address[] memory) {
-        address[] memory trustedProviders = new address[](birdNest);
+        address[] memory trustedProviders =
+            new address[](totalTrustedProviders);
         uint256 t_i = 0;
         uint256 totalProviders = providers.length;
-        for (uint256 i = 0; i < totalProviders; i++) {
+        for (uint256 i = 0; i < totalProviders; i.add(1)) {
             if (statusOf[providers[i]] == TRUSTED) {
                 trustedProviders[t_i] = providers[i];
-                t_i++;
+                t_i.add(1);
             }
         }
         return trustedProviders;
@@ -227,15 +231,20 @@ contract BirdOracle is Unlockable {
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
         require(_totalSentReward != 0, "Can not give ZERO reward.");
         rewards[onPortion] = _totalSentReward;
-        onPortion++;
+        onPortion.add(1);
         rewardToken.transferFrom(owner(), address(this), _totalSentReward);
     }
 
     mapping(address => uint256) private lastRewardPortionOf;
 
-    /// @notice stores the list of rewards given by owner
-    /// @dev answers are divided in portions, (uint256 => uint256) means (answersPortionId => ownerAddedRewardForThisPortion)
-    mapping(uint256 => uint256) public rewards;
+    // stores the list of rewards given by owner
+    // answers are divided in portions, (uint256 => uint256) means (answersPortionId => ownerAddedRewardForThisPortion)
+    mapping(uint256 => uint256) private rewards;
+
+    /// @notice any node provider can call this method to withdraw his reward
+    function withdrawReward() public {
+        withdrawReward(onPortion);
+    }
 
     /// @notice any node provider can call this method to withdraw his reward
     /// @param _portions amount of reward blocks from which you want to get your reward
@@ -244,19 +253,30 @@ contract BirdOracle is Unlockable {
         require(statusOf[sender] == TRUSTED, "You can not withdraw reward.");
 
         uint256 lastRewardedPortion = lastRewardPortionOf[sender];
-        uint256 toRewardPortion = lastRewardedPortion + _portions;
+        uint256 toRewardPortion = lastRewardedPortion.add(_portions);
         if (toRewardPortion > onPortion) toRewardPortion = onPortion;
         lastRewardPortionOf[sender] = toRewardPortion;
         uint256 accReward = getAccReward(lastRewardedPortion, toRewardPortion);
         rewardToken.transfer(sender, accReward);
+        emit RewardWithdrawn(sender, accReward);
     }
 
-    /// @notice any node provider can call this method to withdraw his reward
-    /// @param _portions amount of reward blocks from which you want to get your reward
-    function seeReward(uint256 _portions) public view returns (uint256) {
-        address sender = msg.sender;
-        uint256 lastRewardedPortion = lastRewardPortionOf[sender];
-        uint256 toRewardPortion = lastRewardedPortion + _portions;
+    /// @notice any node provider can call this method to see his reward
+    /// @return reward of a node provider
+    function seeReward(address _sender) public view returns (uint256) {
+        return seeReward(_sender, onPortion);
+    }
+
+    /// @notice any node provider can call this method to see his reward
+    /// @param _portions amount of reward portions from which you want to see your reward
+    /// @return reward of a provider on given number of answers portions
+    function seeReward(address _sender, uint256 _portions)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 lastRewardedPortion = lastRewardPortionOf[_sender];
+        uint256 toRewardPortion = lastRewardedPortion.add(_portions);
         if (toRewardPortion > onPortion) toRewardPortion = onPortion;
         return getAccReward(lastRewardedPortion, toRewardPortion);
     }
@@ -271,12 +291,14 @@ contract BirdOracle is Unlockable {
         for (
             uint256 onThisPortion = lastRewardedPortion;
             onThisPortion < toRewardPortion;
-            onThisPortion++
+            onThisPortion.add(1)
         ) {
             if (totalAnswersGiven[onThisPortion] > 0)
-                accReward += rewards[onThisPortion]
-                    .mul(answersGivenBy[sender][onThisPortion])
-                    .div(totalAnswersGiven[onThisPortion]);
+                accReward = accReward.add(
+                    rewards[onThisPortion]
+                        .mul(answersGivenBy[sender][onThisPortion])
+                        .div(totalAnswersGiven[onThisPortion])
+                );
         }
 
         return accReward;
@@ -292,9 +314,45 @@ contract BirdOracle is Unlockable {
     /// @return list of rewards given by owner
     function rewardsGivenTillNow() public view returns (uint256[] memory) {
         uint256[] memory rewardsGiven = new uint256[](onPortion);
-        for (uint256 i = 1; rewards[i] != 0; i++) {
+        for (uint256 i = 1; rewards[i] != 0; i.add(1)) {
             rewardsGiven[i] = rewards[i];
         }
         return rewardsGiven;
+    }
+
+    /// @notice get total answers given by some provider
+    /// @param _provider the off-chain data provider
+    /// @return total answers given by some provider
+    function totalAnswersGivenByProvider(address _provider)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 totalAnswersGivenByThisProvider = 0;
+        for (
+            uint256 onThisPortion = 0;
+            onThisPortion < onPortion;
+            onThisPortion.add
+        )
+            totalAnswersGivenByThisProvider = totalAnswersGivenByThisProvider
+                .add(answersGivenBy[_provider][onThisPortion]);
+
+        return totalAnswersGivenByThisProvider;
+    }
+
+    /// @notice get total answers given by all providers
+    /// @return total answers given by all providers
+    function totalAnswersGivenByAllProviders() public view returns (uint256) {
+        uint256 theTotalAnswersGiven = 0;
+        for (
+            uint256 onThisPortion = 0;
+            onThisPortion < onPortion;
+            onThisPortion.add(1)
+        )
+            theTotalAnswersGiven = theTotalAnswersGiven.add(
+                totalAnswersGiven[onThisPortion]
+            );
+
+        return theTotalAnswersGiven;
     }
 }
