@@ -106,3 +106,4 @@ dist
 build/contracts
 build/contracts/BirdOracle.json
 build/contracts/Migrations.json
+yarn.lock

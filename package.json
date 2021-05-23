@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "migrate": "truffle migrate --network kovan --reset && truffle run verify BirdOracle --network kovan"
+    "migrate": "truffle migrate --network bscTestnet --reset && truffle run verify BirdOracle --network bscTestnet"
   },
   "repository": {
     "type": "git",
@@ -24,6 +24,7 @@
     "@openzeppelin/contracts": "^3.1.0",
     "@openzeppelin/test-helpers": "^0.5.10",
     "@truffle/hdwallet-provider": "^1.2.2",
+    "dotenv": "^10.0.0",
     "truffle-plugin-verify": "^0.5.4"
   }
 }
