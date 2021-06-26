@@ -26,6 +26,7 @@ module.exports = {
         );
       },
       network_id: "97",
+      skipDryRun: false,
     },
 
     bscMainnet: {
@@ -36,6 +37,7 @@ module.exports = {
         );
       },
       network_id: "56",
+      skipDryRun: false,
     },
 
     mainnet: {

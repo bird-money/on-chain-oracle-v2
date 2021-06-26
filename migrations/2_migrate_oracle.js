@@ -1,5 +1,7 @@
 const BirdOracle = artifacts.require("BirdOracle");
 const BirdToken = artifacts.require("RedToken");
+require("dotenv").config();
+const accountNo = process.env.DEPLOY_ACCOUNT_NO;
 
 const localDeployScript = async (deployer) => {
   console.log("Deploying to local blockchain");
@@ -13,16 +15,16 @@ const kovanDeployScript = async (deployer) => {
   await deployer.deploy(BirdOracle, usdtAddress);
 };
 
-const bscTestnetDeployScript = async (deployer) => {
-  console.log("Deploying to bscTestnet");
+const bscTestnetDeployScript = async (deployer, accounts) => {
+  console.log("Deploying to bscTestnet..");
   const usdtAddress = "0x10e0BC6EBCf6B07D2c8457C806AbCf8Fa0bDA2b7";
-  await deployer.deploy(BirdOracle, usdtAddress);
+  await deployer.deploy(BirdOracle, usdtAddress, { from: accounts[accountNo] });
 };
 
-const mainnetDeployScript = async (deployer) => {
+const bscMainnetDeployScript = async (deployer, accounts) => {
   console.log("Deploying to Mainnet");
-  const birdTokenAddress = "0x70401dFD142A16dC7031c56E862Fc88Cb9537Ce0";
-  await deployer.deploy(BirdOracle, birdTokenAddress);
+  const usdtAddress = "0x55d398326f99059ff775485246999027b3197955";
+  await deployer.deploy(BirdOracle, usdtAddress);
 };
 
 const defaultDeployScript = async (deployer) => {
@@ -31,14 +33,14 @@ const defaultDeployScript = async (deployer) => {
   await deployer.deploy(BirdOracle, birdTokenAddress);
 };
 
-module.exports = async (deployer, network) => {
+module.exports = async (deployer, network, accounts) => {
   switch (network) {
-    case "mainnet":
-      mainnetDeployScript(deployer);
+    case "bscMainnet":
+      bscMainnetDeployScript(deployer, accounts);
       break;
 
     case "bscTestnet":
-      bscTestnetDeployScript(deployer);
+      bscTestnetDeployScript(deployer, accounts);
       break;
 
     case "kovan":

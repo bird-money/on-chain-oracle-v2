@@ -1,5 +1,6 @@
 {
   "name": "bird-contract",
+  "license": "MIT license",
   "version": "1.0.0",
   "description": "",
   "main": "truffle-config.js",
@@ -7,7 +8,9 @@
     "test": "test"
   },
   "scripts": {
-    "migrate": "truffle migrate --network bscTestnet --reset && truffle run verify BirdOracle --network bscTestnet"
+    "migrate": "truffle migrate --network bscTestnet --reset && truffle run verify BirdOracle --network bscTestnet",
+    "migrateBscMainnet": "truffle migrate --network bscMainnet --reset && truffle run verify BirdOracle --network bscMainnet",
+    "start": "yarn migrate"
   },
   "repository": {
     "type": "git",
@@ -15,7 +18,6 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
   "bugs": {
     "url": "https://github.com/moneybirdmi/bird-contract/issues"
   },
