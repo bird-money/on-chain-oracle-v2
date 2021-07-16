@@ -110,7 +110,7 @@ contract BirdOracle is Unlockable {
 
         if (statusOf[_provider] == NOT_TRUSTED) providers.push(_provider);
         statusOf[_provider] = TRUSTED;
-        totalTrustedProviders.add(1);
+        totalTrustedProviders = totalTrustedProviders.add(1);
 
         emit ProviderAdded(_provider);
     }
@@ -121,7 +121,7 @@ contract BirdOracle is Unlockable {
         require(statusOf[_provider] == TRUSTED, "Provider is already removed.");
 
         statusOf[_provider] = WAS_TRUSTED;
-        totalTrustedProviders.sub(1);
+        totalTrustedProviders = totalTrustedProviders.sub(1);
 
         emit ProviderRemoved(_provider);
     }
@@ -146,7 +146,7 @@ contract BirdOracle is Unlockable {
         emit OffChainRequest(currRequestId, _ethAddress, _key);
 
         //update total number of requests
-        currRequestId.add(1);
+        currRequestId = currRequestId.add(1);
     }
 
     /// @notice called by the Off-Chain oracle to record its answer
@@ -171,8 +171,10 @@ contract BirdOracle is Unlockable {
             "Error: You have already voted."
         );
 
-        answersGivenBy[sender][onPortion].add(1);
-        totalAnswersGiven[onPortion].add(1);
+        answersGivenBy[sender][onPortion] = answersGivenBy[sender][onPortion]
+        .add(1);
+
+        totalAnswersGiven[onPortion] = totalAnswersGiven[onPortion].add(1);
 
         req.statusOf[sender] = VOTED;
         req.votesOf[_response] = req.votesOf[_response].add(1);
@@ -206,14 +208,15 @@ contract BirdOracle is Unlockable {
     /// @notice get rating of trusted providers to show on ui
     /// @return the trusted providers list
     function getProviders() external view returns (address[] memory) {
-        address[] memory trustedProviders =
-            new address[](totalTrustedProviders);
+        address[] memory trustedProviders = new address[](
+            totalTrustedProviders
+        );
         uint256 t_i = 0;
         uint256 totalProviders = providers.length;
-        for (uint256 i = 0; i < totalProviders; i.add(1)) {
+        for (uint256 i = 0; i < totalProviders; i = i.add(1)) {
             if (statusOf[providers[i]] == TRUSTED) {
                 trustedProviders[t_i] = providers[i];
-                t_i.add(1);
+                t_i = t_i.add(1);
             }
         }
         return trustedProviders;
@@ -231,7 +234,7 @@ contract BirdOracle is Unlockable {
     function rewardProviders(uint256 _totalSentReward) external onlyOwner {
         require(_totalSentReward != 0, "Can not give ZERO reward.");
         rewards[onPortion] = _totalSentReward;
-        onPortion.add(1);
+        onPortion = onPortion.add(1);
         rewardToken.transferFrom(owner(), address(this), _totalSentReward);
     }
 
@@ -291,13 +294,13 @@ contract BirdOracle is Unlockable {
         for (
             uint256 onThisPortion = lastRewardedPortion;
             onThisPortion < toRewardPortion;
-            onThisPortion.add(1)
+            onThisPortion = onThisPortion.add(1)
         ) {
             if (totalAnswersGiven[onThisPortion] > 0)
                 accReward = accReward.add(
                     rewards[onThisPortion]
-                        .mul(answersGivenBy[sender][onThisPortion])
-                        .div(totalAnswersGiven[onThisPortion])
+                    .mul(answersGivenBy[sender][onThisPortion])
+                    .div(totalAnswersGiven[onThisPortion])
                 );
         }
 
@@ -314,7 +317,7 @@ contract BirdOracle is Unlockable {
     /// @return list of rewards given by owner
     function rewardsGivenTillNow() public view returns (uint256[] memory) {
         uint256[] memory rewardsGiven = new uint256[](onPortion);
-        for (uint256 i = 1; rewards[i] != 0; i.add(1)) {
+        for (uint256 i = 1; rewards[i] != 0; i = i.add(1)) {
             rewardsGiven[i] = rewards[i];
         }
         return rewardsGiven;
@@ -332,10 +335,10 @@ contract BirdOracle is Unlockable {
         for (
             uint256 onThisPortion = 0;
             onThisPortion < onPortion;
-            onThisPortion.add
+            onThisPortion = onThisPortion.add(1)
         )
             totalAnswersGivenByThisProvider = totalAnswersGivenByThisProvider
-                .add(answersGivenBy[_provider][onThisPortion]);
+            .add(answersGivenBy[_provider][onThisPortion]);
 
         return totalAnswersGivenByThisProvider;
     }
@@ -347,7 +350,7 @@ contract BirdOracle is Unlockable {
         for (
             uint256 onThisPortion = 0;
             onThisPortion < onPortion;
-            onThisPortion.add(1)
+            onThisPortion = onThisPortion.add(1)
         )
             theTotalAnswersGiven = theTotalAnswersGiven.add(
                 totalAnswersGiven[onThisPortion]

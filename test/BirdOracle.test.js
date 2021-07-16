@@ -121,7 +121,7 @@ contract("BirdOracle", (accounts) => {
     //   (await birdOracle.getTotalAnswersGivenAfterReward()).toString()
     // );
 
-    let rewardProvider1 = await birdOracle.seeReward(100, {
+    let rewardProvider1 = await birdOracle.seeReward(provider1, {
       from: provider1,
     });
     // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
@@ -132,7 +132,7 @@ contract("BirdOracle", (accounts) => {
     // console.log("provider1reward: ", fromWei(provider1reward.toString()));
 
     // // console.log()
-    rewardProvider1 = await birdOracle.seeReward(100, {
+    rewardProvider1 = await birdOracle.seeReward(provider1, {
       from: provider1,
     });
     // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
@@ -166,7 +166,7 @@ contract("BirdOracle", (accounts) => {
     await birdToken.approve(birdOracle.address, toWei("100000000"));
     await birdOracle.rewardProviders(toWei("80"));
 
-    rewardProvider1 = await birdOracle.seeReward(100, {
+    rewardProvider1 = await birdOracle.seeReward(provider1, {
       from: provider1,
     });
     // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
@@ -177,7 +177,8 @@ contract("BirdOracle", (accounts) => {
     // console.log("provider1reward: ", fromWei(provider1reward.toString()));
 
     // // console.log()
-    rewardProvider1 = await birdOracle.seeReward(100, {
+
+    rewardProvider1 = await birdOracle.seeReward(provider1, {
       from: provider1,
     });
     // console.log("rewardProvider1: ", fromWei(rewardProvider1.toString()));
